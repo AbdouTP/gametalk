@@ -5,19 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GameTalk</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      overflow: hidden;
-    }
-    #root {
-      width: 100vw;
-      height: 100vh;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; overflow: hidden; }
+    #root { width: 100vw; height: 100vh; }
   </style>
 </head>
 <body>
@@ -26,1421 +16,481 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://unpkg.com/lucide-react@0.263.1/dist/umd/lucide-react.js"></script>
   
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
-    const { Video, VideoOff, Mic, MicOff, Monitor, Phone, Settings, Users, MessageSquare, UserPlus, LogOut, X, Send, Plus } = lucide;
 
-    import React, { useState, useEffect, useRef } from 'react';
-import { Video, VideoOff, Mic, MicOff, Monitor, Phone, Settings, Users, MessageSquare, UserPlus, LogOut, X, Send, Image, Film, Plus } from 'lucide-react';
-
-const GameTalk = () => {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [users, setUsers] = useState([]);
-  const [friends, setFriends] = useState([]);
-  const [messages, setMessages] = useState([]);
-  const [groups, setGroups] = useState([]);
-  const [voiceRoom, setVoiceRoom] = useState(null);
-  const [screen, setScreen] = useState('login');
-  const [settings, setSettings] = useState({
-    bgColor: '#0f0f23',
-    accentColor: '#00d4ff',
-    secondaryColor: '#1a1a2e'
-  });
-  
-  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
-  const [registerForm, setRegisterForm] = useState({ username: '', password: '' });
-  const [messageInput, setMessageInput] = useState('');
-  const [selectedChat, setSelectedChat] = useState('general');
-  const [friendRequest, setFriendRequest] = useState('');
-  const [newGroupName, setNewGroupName] = useState('');
-  const [selectedFriends, setSelectedFriends] = useState([]);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showCreateGroup, setShowCreateGroup] = useState(false);
-  const [showAddFriend, setShowAddFriend] = useState(false);
-  
-  const [voiceState, setVoiceState] = useState({
-    muted: false,
-    deafened: false,
-    video: false,
-    screen: false
-  });
-
-  const fileInputRef = useRef(null);
-  const videoRef = useRef(null);
-  const screenRef = useRef(null);
-
-  // Initialisation au chargement
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    try {
-      // Charger les utilisateurs
-      const usersResult = await window.storage.get('gametalk_users', true);
-      const loadedUsers = usersResult ? JSON.parse(usersResult.value) : [];
-      setUsers(loadedUsers);
-
-      // Charger les messages
-      const messagesResult = await window.storage.get('gametalk_messages', true);
-      const loadedMessages = messagesResult ? JSON.parse(messagesResult.value) : [];
-      setMessages(loadedMessages);
-
-      // Vérifier session utilisateur
-      const sessionResult = await window.storage.get('gametalk_session');
-      if (sessionResult) {
-        const session = JSON.parse(sessionResult.value);
-        const user = loadedUsers.find(u => u.username === session.username);
-        if (user) {
-          setCurrentUser(user);
-          loadUserData(user.username);
-          setScreen('chat');
-        }
-      }
-    } catch (error) {
-      console.log('Première visite ou données non disponibles');
-    }
-  };
-
-  const loadUserData = async (username) => {
-    try {
-      const friendsResult = await window.storage.get(`gametalk_friends_${username}`);
-      if (friendsResult) {
-        setFriends(JSON.parse(friendsResult.value));
-      }
-
-      const groupsResult = await window.storage.get(`gametalk_groups_${username}`);
-      if (groupsResult) {
-        setGroups(JSON.parse(groupsResult.value));
-      }
-    } catch (error) {
-      console.log('Pas de données utilisateur');
-    }
-  };
-
-  const saveData = async () => {
-    try {
-      await window.storage.set('gametalk_users', JSON.stringify(users), true);
-      await window.storage.set('gametalk_messages', JSON.stringify(messages), true);
-    } catch (error) {
-      console.error('Erreur sauvegarde:', error);
-    }
-  };
-
-  const register = async () => {
-    if (!registerForm.username || !registerForm.password) {
-      alert('Veuillez remplir tous les champs');
-      return;
-    }
-
-    const userNumber = users.length + 1;
-    const tag = String(userNumber).padStart(4, '0');
-    const fullUsername = `${registerForm.username}#${tag}`;
-
-    const newUser = {
-      username: fullUsername,
-      password: registerForm.password,
-      avatar: null,
-      displayName: registerForm.username,
-      createdAt: Date.now()
-    };
-
-    const updatedUsers = [...users, newUser];
-    setUsers(updatedUsers);
-    await window.storage.set('gametalk_users', JSON.stringify(updatedUsers), true);
-
-    alert(`Compte créé! Votre nom d'utilisateur est: ${fullUsername}`);
-    setRegisterForm({ username: '', password: '' });
-  };
-
-  const login = async () => {
-    const user = users.find(u => 
-      u.username === loginForm.username && u.password === loginForm.password
+    const Icon = ({ children, size = 24, ...props }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        {children}
+      </svg>
     );
 
-    if (user) {
-      setCurrentUser(user);
-      await window.storage.set('gametalk_session', JSON.stringify({ username: user.username }));
-      await loadUserData(user.username);
-      setScreen('chat');
-    } else {
-      alert('Identifiants incorrects');
-    }
-  };
+    const Video = (props) => <Icon {...props}><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></Icon>;
+    const VideoOff = (props) => <Icon {...props}><path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34l1 1L23 7v10"></path><line x1="1" y1="1" x2="23" y2="23"></line></Icon>;
+    const Mic = (props) => <Icon {...props}><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></Icon>;
+    const MicOff = (props) => <Icon {...props}><line x1="1" y1="1" x2="23" y2="23"></line><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></Icon>;
+    const Monitor = (props) => <Icon {...props}><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></Icon>;
+    const Phone = (props) => <Icon {...props}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></Icon>;
+    const Settings = (props) => <Icon {...props}><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></Icon>;
+    const Users = (props) => <Icon {...props}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></Icon>;
+    const MessageSquare = (props) => <Icon {...props}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></Icon>;
+    const UserPlus = (props) => <Icon {...props}><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></Icon>;
+    const LogOut = (props) => <Icon {...props}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></Icon>;
+    const X = (props) => <Icon {...props}><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></Icon>;
+    const Send = (props) => <Icon {...props}><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></Icon>;
+    const Plus = (props) => <Icon {...props}><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></Icon>;
 
-  const logout = async () => {
-    await window.storage.delete('gametalk_session');
-    setCurrentUser(null);
-    setScreen('login');
-    leaveVoice();
-  };
-
-  const sendMessage = async () => {
-    if (!messageInput.trim()) return;
-
-    const newMessage = {
-      id: Date.now(),
-      author: currentUser.username,
-      authorDisplay: currentUser.displayName,
-      avatar: currentUser.avatar,
-      content: messageInput,
-      channel: selectedChat,
-      timestamp: Date.now()
+    const memoryStorage = {
+      data: {},
+      get: (key) => memoryStorage.data[key] ? { value: memoryStorage.data[key] } : null,
+      set: (key, value) => { memoryStorage.data[key] = value; return { key, value }; },
+      delete: (key) => { delete memoryStorage.data[key]; return { key, deleted: true }; }
     };
+	
+	const GameTalk = () => {
+      const [currentUser, setCurrentUser] = useState(null);
+      const [users, setUsers] = useState([]);
+      const [friends, setFriends] = useState([]);
+      const [messages, setMessages] = useState([]);
+      const [groups, setGroups] = useState([]);
+      const [voiceRoom, setVoiceRoom] = useState(null);
+      const [screen, setScreen] = useState('login');
+      const [settings, setSettings] = useState({ bgColor: '#0f0f23', accentColor: '#00d4ff', secondaryColor: '#1a1a2e' });
+      const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+      const [registerForm, setRegisterForm] = useState({ username: '', password: '' });
+      const [messageInput, setMessageInput] = useState('');
+      const [selectedChat, setSelectedChat] = useState('general');
+      const [friendRequest, setFriendRequest] = useState('');
+      const [newGroupName, setNewGroupName] = useState('');
+      const [selectedFriends, setSelectedFriends] = useState([]);
+      const [showSettings, setShowSettings] = useState(false);
+      const [showCreateGroup, setShowCreateGroup] = useState(false);
+      const [showAddFriend, setShowAddFriend] = useState(false);
+      const [voiceState, setVoiceState] = useState({ muted: false, deafened: false, video: false, screen: false });
+      const fileInputRef = useRef(null);
+      const videoRef = useRef(null);
+      const screenRef = useRef(null);
 
-    const updatedMessages = [...messages, newMessage];
-    setMessages(updatedMessages);
-    await window.storage.set('gametalk_messages', JSON.stringify(updatedMessages), true);
-    setMessageInput('');
-  };
+      useEffect(() => { loadData(); }, []);
 
-  const sendFile = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const isVideo = file.type.startsWith('video/');
-    const maxSize = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024; // 50MB vidéo, 10MB image
-
-    if (file.size > maxSize) {
-      alert(`Fichier trop volumineux! Maximum ${isVideo ? '50MB' : '10MB'}`);
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const newMessage = {
-        id: Date.now(),
-        author: currentUser.username,
-        authorDisplay: currentUser.displayName,
-        avatar: currentUser.avatar,
-        content: '',
-        file: event.target.result,
-        fileType: file.type,
-        fileName: file.name,
-        channel: selectedChat,
-        timestamp: Date.now()
+      const loadData = () => {
+        try {
+          const usersResult = memoryStorage.get('gametalk_users');
+          const loadedUsers = usersResult ? JSON.parse(usersResult.value) : [];
+          setUsers(loadedUsers);
+          const messagesResult = memoryStorage.get('gametalk_messages');
+          const loadedMessages = messagesResult ? JSON.parse(messagesResult.value) : [];
+          setMessages(loadedMessages);
+          const sessionResult = memoryStorage.get('gametalk_session');
+          if (sessionResult) {
+            const session = JSON.parse(sessionResult.value);
+            const user = loadedUsers.find(u => u.username === session.username);
+            if (user) { setCurrentUser(user); loadUserData(user.username); setScreen('chat'); }
+          }
+        } catch (error) { console.log('Première visite'); }
       };
 
-      const updatedMessages = [...messages, newMessage];
-      setMessages(updatedMessages);
-      await window.storage.set('gametalk_messages', JSON.stringify(updatedMessages), true);
-    };
-    reader.readAsDataURL(file);
-  };
+      const loadUserData = (username) => {
+        try {
+          const friendsResult = memoryStorage.get(`gametalk_friends_${username}`);
+          if (friendsResult) setFriends(JSON.parse(friendsResult.value));
+          const groupsResult = memoryStorage.get(`gametalk_groups_${username}`);
+          if (groupsResult) setGroups(JSON.parse(groupsResult.value));
+        } catch (error) { console.log('Pas de données utilisateur'); }
+      };
 
-  const addFriend = async () => {
-    const friend = users.find(u => u.username === friendRequest);
-    if (!friend) {
-      alert('Utilisateur non trouvé');
-      return;
-    }
-
-    if (friend.username === currentUser.username) {
-      alert('Vous ne pouvez pas vous ajouter vous-même');
-      return;
-    }
-
-    if (friends.find(f => f.username === friend.username)) {
-      alert('Déjà dans vos amis');
-      return;
-    }
-
-    const updatedFriends = [...friends, friend];
-    setFriends(updatedFriends);
-    await window.storage.set(`gametalk_friends_${currentUser.username}`, JSON.stringify(updatedFriends));
-    setFriendRequest('');
-    setShowAddFriend(false);
-  };
-
-  const createGroup = async () => {
-    if (!newGroupName || selectedFriends.length === 0) {
-      alert('Nom et membres requis');
-      return;
-    }
-
-    const newGroup = {
-      id: Date.now(),
-      name: newGroupName,
-      members: [currentUser.username, ...selectedFriends],
-      createdAt: Date.now()
-    };
-
-    const updatedGroups = [...groups, newGroup];
-    setGroups(updatedGroups);
-    await window.storage.set(`gametalk_groups_${currentUser.username}`, JSON.stringify(updatedGroups));
-    setNewGroupName('');
-    setSelectedFriends([]);
-    setShowCreateGroup(false);
-  };
-
-  const joinVoice = async (roomId) => {
-    setVoiceRoom(roomId);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      // Stream actif
-    } catch (error) {
-      alert('Impossible d\'accéder au microphone');
-    }
-  };
-
-  const leaveVoice = () => {
-    setVoiceRoom(null);
-    setVoiceState({ muted: false, deafened: false, video: false, screen: false });
-  };
-
-  const toggleVideo = async () => {
-    if (!voiceState.video) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-        setVoiceState({ ...voiceState, video: true });
-      } catch (error) {
-        alert('Impossible d\'accéder à la caméra');
-      }
-    } else {
-      if (videoRef.current && videoRef.current.srcObject) {
-        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-      }
-      setVoiceState({ ...voiceState, video: false });
-    }
-  };
-
-  const toggleScreen = async () => {
-    if (!voiceState.screen) {
-      try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        if (screenRef.current) {
-          screenRef.current.srcObject = stream;
-        }
-        setVoiceState({ ...voiceState, screen: true });
-      } catch (error) {
-        alert('Partage d\'écran annulé');
-      }
-    } else {
-      if (screenRef.current && screenRef.current.srcObject) {
-        screenRef.current.srcObject.getTracks().forEach(track => track.stop());
-      }
-      setVoiceState({ ...voiceState, screen: false });
-    }
-  };
-
-  const updateSettings = async (key, value) => {
-    const newSettings = { ...settings, [key]: value };
-    setSettings(newSettings);
-    await window.storage.set(`gametalk_settings_${currentUser.username}`, JSON.stringify(newSettings));
-  };
-
-  const updateProfile = async (field, value) => {
-    if (field === 'avatar') {
-      const file = value;
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const updatedUser = { ...currentUser, avatar: e.target.result };
-        setCurrentUser(updatedUser);
-        const updatedUsers = users.map(u => u.username === currentUser.username ? updatedUser : u);
+      const register = () => {
+        if (!registerForm.username || !registerForm.password) { alert('Veuillez remplir tous les champs'); return; }
+        const userNumber = users.length + 1;
+        const tag = String(userNumber).padStart(4, '0');
+        const fullUsername = `${registerForm.username}#${tag}`;
+        const newUser = { username: fullUsername, password: registerForm.password, avatar: null, displayName: registerForm.username, createdAt: Date.now() };
+        const updatedUsers = [...users, newUser];
         setUsers(updatedUsers);
-        await window.storage.set('gametalk_users', JSON.stringify(updatedUsers), true);
+        memoryStorage.set('gametalk_users', JSON.stringify(updatedUsers));
+        alert(`Compte créé! Votre nom d'utilisateur est: ${fullUsername}`);
+        setRegisterForm({ username: '', password: '' });
       };
-      reader.readAsDataURL(file);
-    } else if (field === 'displayName') {
-      const updatedUser = { ...currentUser, displayName: value };
-      setCurrentUser(updatedUser);
-      const updatedUsers = users.map(u => u.username === currentUser.username ? updatedUser : u);
-      setUsers(updatedUsers);
-      await window.storage.set('gametalk_users', JSON.stringify(updatedUsers), true);
-    }
-  };
 
-  const getVoiceParticipants = () => {
-    if (!voiceRoom) return [];
-    return [currentUser.displayName];
-  };
+      const login = () => {
+        const user = users.find(u => u.username === loginForm.username && u.password === loginForm.password);
+        if (user) { setCurrentUser(user); memoryStorage.set('gametalk_session', JSON.stringify({ username: user.username })); loadUserData(user.username); setScreen('chat'); }
+        else alert('Identifiants incorrects');
+      };
 
-  const filteredMessages = messages.filter(m => m.channel === selectedChat);
+      const logout = () => { memoryStorage.delete('gametalk_session'); setCurrentUser(null); setScreen('login'); leaveVoice(); };
 
-  if (screen === 'login') {
-    return (
-      <div style={{ 
-        minHeight: '100vh', 
-        background: `linear-gradient(135deg, ${settings.bgColor} 0%, ${settings.secondaryColor} 100%)`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontFamily: 'system-ui, -apple-system, sans-serif'
-      }}>
-        <div style={{
-          background: 'rgba(255,255,255,0.05)',
-          backdropFilter: 'blur(20px)',
-          borderRadius: '24px',
-          padding: '48px',
-          width: '400px',
-          border: '1px solid rgba(255,255,255,0.1)',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
-        }}>
-          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <h1 style={{ 
-              color: settings.accentColor, 
-              fontSize: '42px', 
-              margin: '0 0 8px 0',
-              fontWeight: '800',
-              textShadow: `0 0 30px ${settings.accentColor}80`
-            }}>GameTalk</h1>
-            <p style={{ color: '#888', margin: 0 }}>Connectez-vous avec vos amis</p>
-          </div>
+      const sendMessage = () => {
+        if (!messageInput.trim()) return;
+        const newMessage = { id: Date.now(), author: currentUser.username, authorDisplay: currentUser.displayName, avatar: currentUser.avatar, content: messageInput, channel: selectedChat, timestamp: Date.now() };
+        const updatedMessages = [...messages, newMessage];
+        setMessages(updatedMessages);
+        memoryStorage.set('gametalk_messages', JSON.stringify(updatedMessages));
+        setMessageInput('');
+      };
 
-          <div style={{ marginBottom: '24px' }}>
-            <h3 style={{ color: '#fff', marginBottom: '16px' }}>Connexion</h3>
-            <input
-              type="text"
-              placeholder="Nom#0000"
-              value={loginForm.username}
-              onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
-              style={{
-                width: '100%',
-                padding: '12px',
-                marginBottom: '12px',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '12px',
-                color: '#fff',
-                fontSize: '14px'
-              }}
-            />
-            <input
-              type="password"
-              placeholder="Mot de passe"
-              value={loginForm.password}
-              onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-              style={{
-                width: '100%',
-                padding: '12px',
-                marginBottom: '12px',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '12px',
-                color: '#fff',
-                fontSize: '14px'
-              }}
-            />
-            <button
-              onClick={login}
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: settings.accentColor,
-                color: settings.bgColor,
-                border: 'none',
-                borderRadius: '12px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                fontSize: '16px',
-                transition: 'all 0.3s'
-              }}
-            >
-              Se connecter
-            </button>
-          </div>
+      const sendFile = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const isVideo = file.type.startsWith('video/');
+        const maxSize = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+        if (file.size > maxSize) { alert(`Fichier trop volumineux! Maximum ${isVideo ? '50MB' : '10MB'}`); return; }
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const newMessage = { id: Date.now(), author: currentUser.username, authorDisplay: currentUser.displayName, avatar: currentUser.avatar, content: '', file: event.target.result, fileType: file.type, fileName: file.name, channel: selectedChat, timestamp: Date.now() };
+          const updatedMessages = [...messages, newMessage];
+          setMessages(updatedMessages);
+          memoryStorage.set('gametalk_messages', JSON.stringify(updatedMessages));
+        };
+        reader.readAsDataURL(file);
+      };
 
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '24px' }}>
-            <h3 style={{ color: '#fff', marginBottom: '16px' }}>Créer un compte</h3>
-            <input
-              type="text"
-              placeholder="Pseudo"
-              value={registerForm.username}
-              onChange={(e) => setRegisterForm({ ...registerForm, username: e.target.value })}
-              style={{
-                width: '100%',
-                padding: '12px',
-                marginBottom: '12px',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '12px',
-                color: '#fff',
-                fontSize: '14px'
-              }}
-            />
-            <input
-              type="password"
-              placeholder="Mot de passe"
-              value={registerForm.password}
-              onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-              style={{
-                width: '100%',
-                padding: '12px',
-                marginBottom: '12px',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '12px',
-                color: '#fff',
-                fontSize: '14px'
-              }}
-            />
-            <button
-              onClick={register}
-              style={{
-                width: '100%',
-                padding: '12px',
-                background: 'transparent',
-                color: settings.accentColor,
-                border: `2px solid ${settings.accentColor}`,
-                borderRadius: '12px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                fontSize: '16px'
-              }}
-            >
-              S'inscrire
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+      const addFriend = () => {
+        const friend = users.find(u => u.username === friendRequest);
+        if (!friend) { alert('Utilisateur non trouvé'); return; }
+        if (friend.username === currentUser.username) { alert('Vous ne pouvez pas vous ajouter vous-même'); return; }
+        if (friends.find(f => f.username === friend.username)) { alert('Déjà dans vos amis'); return; }
+        const updatedFriends = [...friends, friend];
+        setFriends(updatedFriends);
+        memoryStorage.set(`gametalk_friends_${currentUser.username}`, JSON.stringify(updatedFriends));
+        setFriendRequest('');
+        setShowAddFriend(false);
+      };
 
-  return (
-    <div style={{ 
-      height: '100vh', 
-      display: 'flex',
-      background: settings.bgColor,
-      color: '#fff',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      overflow: 'hidden'
-    }}>
-      {/* Sidebar gauche */}
-      <div style={{
-        width: '280px',
-        background: settings.secondaryColor,
-        borderRight: '1px solid rgba(255,255,255,0.05)',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        <div style={{ 
-          padding: '20px', 
-          borderBottom: '1px solid rgba(255,255,255,0.05)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px'
-        }}>
-          <h2 style={{ 
-            color: settings.accentColor, 
-            margin: 0,
-            fontSize: '24px',
-            fontWeight: '800'
-          }}>GameTalk</h2>
-        </div>
+      const createGroup = () => {
+        if (!newGroupName || selectedFriends.length === 0) { alert('Nom et membres requis'); return; }
+        const newGroup = { id: Date.now(), name: newGroupName, members: [currentUser.username, ...selectedFriends], createdAt: Date.now() };
+        const updatedGroups = [...groups, newGroup];
+        setGroups(updatedGroups);
+        memoryStorage.set(`gametalk_groups_${currentUser.username}`, JSON.stringify(updatedGroups));
+        setNewGroupName(''); setSelectedFriends([]); setShowCreateGroup(false);
+      };
 
-        <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
-          <div style={{ marginBottom: '24px' }}>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'space-between',
-              marginBottom: '12px'
-            }}>
-              <h3 style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', margin: 0 }}>
-                Canaux
-              </h3>
-            </div>
-            <div
-              onClick={() => setSelectedChat('general')}
-              style={{
-                padding: '10px 12px',
-                background: selectedChat === 'general' ? 'rgba(0,212,255,0.1)' : 'transparent',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '4px',
-                transition: 'all 0.2s'
-              }}
-            >
-              <MessageSquare size={18} color={settings.accentColor} />
-              <span>Général</span>
-            </div>
-          </div>
+      const joinVoice = async (roomId) => { setVoiceRoom(roomId); try { await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); } catch (error) { alert('Impossible d\'accéder au microphone'); } };
+      const leaveVoice = () => { setVoiceRoom(null); setVoiceState({ muted: false, deafened: false, video: false, screen: false }); };
 
-          <div style={{ marginBottom: '24px' }}>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'space-between',
-              marginBottom: '12px'
-            }}>
-              <h3 style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', margin: 0 }}>
-                Amis
-              </h3>
-              <UserPlus 
-                size={16} 
-                style={{ cursor: 'pointer', color: settings.accentColor }}
-                onClick={() => setShowAddFriend(true)}
-              />
-            </div>
-            {friends.map(friend => (
-              <div
-                key={friend.username}
-                onClick={() => setSelectedChat(friend.username)}
-                style={{
-                  padding: '10px 12px',
-                  background: selectedChat === friend.username ? 'rgba(0,212,255,0.1)' : 'transparent',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '4px'
-                }}
-              >
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: friend.avatar ? `url(${friend.avatar})` : settings.accentColor,
-                  backgroundSize: 'cover',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '14px',
-                  fontWeight: '600'
-                }}>
-                  {!friend.avatar && friend.displayName[0]}
-                </div>
-                <span style={{ fontSize: '14px' }}>{friend.displayName}</span>
+      const toggleVideo = async () => {
+        if (!voiceState.video) {
+          try { const stream = await navigator.mediaDevices.getUserMedia({ video: true }); if (videoRef.current) videoRef.current.srcObject = stream; setVoiceState({ ...voiceState, video: true }); }
+          catch (error) { alert('Impossible d\'accéder à la caméra'); }
+        } else {
+          if (videoRef.current && videoRef.current.srcObject) videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+          setVoiceState({ ...voiceState, video: false });
+        }
+      };
+
+      const toggleScreen = async () => {
+        if (!voiceState.screen) {
+          try { const stream = await navigator.mediaDevices.getDisplayMedia({ video: true }); if (screenRef.current) screenRef.current.srcObject = stream; setVoiceState({ ...voiceState, screen: true }); }
+          catch (error) { alert('Partage d\'écran annulé'); }
+        } else {
+          if (screenRef.current && screenRef.current.srcObject) screenRef.current.srcObject.getTracks().forEach(track => track.stop());
+          setVoiceState({ ...voiceState, screen: false });
+        }
+      };
+
+      const updateSettings = (key, value) => { const newSettings = { ...settings, [key]: value }; setSettings(newSettings); memoryStorage.set(`gametalk_settings_${currentUser.username}`, JSON.stringify(newSettings)); };
+
+      const updateProfile = (field, value) => {
+        if (field === 'avatar') {
+          const file = value; const reader = new FileReader();
+          reader.onload = (e) => {
+            const updatedUser = { ...currentUser, avatar: e.target.result };
+            setCurrentUser(updatedUser);
+            const updatedUsers = users.map(u => u.username === currentUser.username ? updatedUser : u);
+            setUsers(updatedUsers);
+            memoryStorage.set('gametalk_users', JSON.stringify(updatedUsers));
+          };
+          reader.readAsDataURL(file);
+        } else if (field === 'displayName') {
+          const updatedUser = { ...currentUser, displayName: value };
+          setCurrentUser(updatedUser);
+          const updatedUsers = users.map(u => u.username === currentUser.username ? updatedUser : u);
+          setUsers(updatedUsers);
+          memoryStorage.set('gametalk_users', JSON.stringify(updatedUsers));
+        }
+      };
+
+      const getVoiceParticipants = () => !voiceRoom ? [] : [currentUser.displayName];
+      const filteredMessages = messages.filter(m => m.channel === selectedChat);
+	  
+	  if (screen === 'login') {
+        return (
+          <div style={{ minHeight: '100vh', background: `linear-gradient(135deg, ${settings.bgColor} 0%, ${settings.secondaryColor} 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)', borderRadius: '24px', padding: '48px', width: '400px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+              <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                <h1 style={{ color: settings.accentColor, fontSize: '42px', margin: '0 0 8px 0', fontWeight: '800', textShadow: `0 0 30px ${settings.accentColor}80` }}>GameTalk</h1>
+                <p style={{ color: '#888', margin: 0 }}>Connectez-vous avec vos amis</p>
               </div>
-            ))}
-          </div>
-
-          <div>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'space-between',
-              marginBottom: '12px'
-            }}>
-              <h3 style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', margin: 0 }}>
-                Groupes
-              </h3>
-              <Plus 
-                size={16} 
-                style={{ cursor: 'pointer', color: settings.accentColor }}
-                onClick={() => setShowCreateGroup(true)}
-              />
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ color: '#fff', marginBottom: '16px' }}>Connexion</h3>
+                <input type="text" placeholder="Nom#0000" value={loginForm.username} onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })} style={{ width: '100%', padding: '12px', marginBottom: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff', fontSize: '14px' }} />
+                <input type="password" placeholder="Mot de passe" value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} onKeyPress={(e) => e.key === 'Enter' && login()} style={{ width: '100%', padding: '12px', marginBottom: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff', fontSize: '14px' }} />
+                <button onClick={login} style={{ width: '100%', padding: '12px', background: settings.accentColor, color: settings.bgColor, border: 'none', borderRadius: '12px', fontWeight: '600', cursor: 'pointer', fontSize: '16px' }}>Se connecter</button>
+              </div>
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '24px' }}>
+                <h3 style={{ color: '#fff', marginBottom: '16px' }}>Créer un compte</h3>
+                <input type="text" placeholder="Pseudo" value={registerForm.username} onChange={(e) => setRegisterForm({ ...registerForm, username: e.target.value })} style={{ width: '100%', padding: '12px', marginBottom: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff', fontSize: '14px' }} />
+                <input type="password" placeholder="Mot de passe" value={registerForm.password} onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })} style={{ width: '100%', padding: '12px', marginBottom: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff', fontSize: '14px' }} />
+                <button onClick={register} style={{ width: '100%', padding: '12px', background: 'transparent', color: settings.accentColor, border: `2px solid ${settings.accentColor}`, borderRadius: '12px', fontWeight: '600', cursor: 'pointer', fontSize: '16px' }}>S'inscrire</button>
+              </div>
             </div>
-            {groups.map(group => (
-              <div
-                key={group.id}
-                onClick={() => setSelectedChat(`group_${group.id}`)}
-                style={{
-                  padding: '10px 12px',
-                  background: selectedChat === `group_${group.id}` ? 'rgba(0,212,255,0.1)' : 'transparent',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  marginBottom: '4px'
-                }}
-              >
-                <div style={{ fontSize: '14px', fontWeight: '500' }}>{group.name}</div>
-                <div style={{ fontSize: '11px', color: '#666' }}>
-                  {group.members.length} membres
+          </div>
+        );
+      }
+
+      return (
+        <div style={{ height: '100vh', display: 'flex', background: settings.bgColor, color: '#fff', overflow: 'hidden' }}>
+          <div style={{ width: '280px', background: settings.secondaryColor, borderRight: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <h2 style={{ color: settings.accentColor, margin: 0, fontSize: '24px', fontWeight: '800' }}>GameTalk</h2>
+            </div>
+            <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', marginBottom: '12px' }}>Canaux</h3>
+                <div onClick={() => setSelectedChat('general')} style={{ padding: '10px 12px', background: selectedChat === 'general' ? 'rgba(0,212,255,0.1)' : 'transparent', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <MessageSquare size={18} color={settings.accentColor} />
+                  <span>Général</span>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ 
-          padding: '16px', 
-          borderTop: '1px solid rgba(255,255,255,0.05)',
-          background: 'rgba(0,0,0,0.2)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-            <div style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              background: currentUser.avatar ? `url(${currentUser.avatar})` : settings.accentColor,
-              backgroundSize: 'cover',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '16px',
-              fontWeight: '600'
-            }}>
-              {!currentUser.avatar && currentUser.displayName[0]}
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '14px', fontWeight: '500' }}>{currentUser.displayName}</div>
-              <div style={{ fontSize: '11px', color: '#666' }}>{currentUser.username}</div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              onClick={() => setShowSettings(true)}
-              style={{
-                flex: 1,
-                padding: '8px',
-                background: 'rgba(255,255,255,0.05)',
-                border: 'none',
-                borderRadius: '8px',
-                color: '#fff',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px'
-              }}
-            >
-              <Settings size={16} />
-            </button>
-            <button
-              onClick={logout}
-              style={{
-                flex: 1,
-                padding: '8px',
-                background: 'rgba(255,255,255,0.05)',
-                border: 'none',
-                borderRadius: '8px',
-                color: '#fff',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px'
-              }}
-            >
-              <LogOut size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Zone principale */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ 
-          padding: '20px', 
-          borderBottom: '1px solid rgba(255,255,255,0.05)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>
-            {selectedChat === 'general' ? '# Général' : 
-             selectedChat.startsWith('group_') ? groups.find(g => `group_${g.id}` === selectedChat)?.name :
-             friends.find(f => f.username === selectedChat)?.displayName}
-          </h2>
-          {!voiceRoom ? (
-            <button
-              onClick={() => joinVoice(selectedChat)}
-              style={{
-                padding: '8px 16px',
-                background: settings.accentColor,
-                color: settings.bgColor,
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontWeight: '500'
-              }}
-            >
-              <Phone size={18} />
-              Rejoindre vocal
-            </button>
-          ) : (
-            <button
-              onClick={leaveVoice}
-              style={{
-                padding: '8px 16px',
-                background: '#ff4444',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontWeight: '500'
-              }}
-            >
-              <Phone size={18} />
-              Quitter vocal
-            </button>
-          )}
-        </div>
-
-        <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
-          {filteredMessages.map(msg => (
-            <div key={msg.id} style={{ 
-              marginBottom: '20px',
-              display: 'flex',
-              gap: '12px'
-            }}>
-              <div style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '50%',
-                background: msg.avatar ? `url(${msg.avatar})` : settings.accentColor,
-                backgroundSize: 'cover',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '16px',
-                fontWeight: '600',
-                flexShrink: 0
-              }}>
-                {!msg.avatar && msg.authorDisplay[0]}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ marginBottom: '4px' }}>
-                  <span style={{ fontWeight: '500', marginRight: '8px' }}>{msg.authorDisplay}</span>
-                  <span style={{ fontSize: '12px', color: '#666' }}>
-                    {new Date(msg.timestamp).toLocaleTimeString('fr-FR', { 
-                      hour: '2-digit', 
-                      minute: '2-digit' 
-                    })}
-                  </span>
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', margin: 0 }}>Amis</h3>
+                  <UserPlus size={16} style={{ cursor: 'pointer', color: settings.accentColor }} onClick={() => setShowAddFriend(true)} />
                 </div>
-                {msg.content && <div style={{ color: '#ddd' }}>{msg.content}</div>}
-                {msg.file && (
-                  msg.fileType.startsWith('image/') ? (
-                    <img src={msg.file} alt={msg.fileName} style={{ 
-                      maxWidth: '400px', 
-                      borderRadius: '8px',
-                      marginTop: '8px'
-                    }} />
-                  ) : msg.fileType.startsWith('video/') ? (
-                    <video src={msg.file} controls style={{ 
-                      maxWidth: '400px', 
-                      borderRadius: '8px',
-                      marginTop: '8px'
-                    }} />
-                  ) : null
+                {friends.map(friend => (
+                  <div key={friend.username} onClick={() => setSelectedChat(friend.username)} style={{ padding: '10px 12px', background: selectedChat === friend.username ? 'rgba(0,212,255,0.1)' : 'transparent', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: friend.avatar ? `url(${friend.avatar})` : settings.accentColor, backgroundSize: 'cover', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '600' }}>
+                      {!friend.avatar && friend.displayName[0]}
+                    </div>
+                    <span style={{ fontSize: '14px' }}>{friend.displayName}</span>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', margin: 0 }}>Groupes</h3>
+                  <Plus size={16} style={{ cursor: 'pointer', color: settings.accentColor }} onClick={() => setShowCreateGroup(true)} />
+                </div>
+                {groups.map(group => (
+                  <div key={group.id} onClick={() => setSelectedChat(`group_${group.id}`)} style={{ padding: '10px 12px', background: selectedChat === `group_${group.id}` ? 'rgba(0,212,255,0.1)' : 'transparent', borderRadius: '8px', cursor: 'pointer', marginBottom: '4px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '500' }}>{group.name}</div>
+                    <div style={{ fontSize: '11px', color: '#666' }}>{group.members.length} membres</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: currentUser.avatar ? `url(${currentUser.avatar})` : settings.accentColor, backgroundSize: 'cover', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '600' }}>
+                  {!currentUser.avatar && currentUser.displayName[0]}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '14px', fontWeight: '500' }}>{currentUser.displayName}</div>
+                  <div style={{ fontSize: '11px', color: '#666' }}>{currentUser.username}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => setShowSettings(true)} style={{ flex: 1, padding: '8px', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Settings size={16} /></button>
+                <button onClick={logout} style={{ flex: 1, padding: '8px', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><LogOut size={16} /></button>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>
+                {selectedChat === 'general' ? '# Général' : selectedChat.startsWith('group_') ? groups.find(g => `group_${g.id}` === selectedChat)?.name : friends.find(f => f.username === selectedChat)?.displayName}
+              </h2>
+              {!voiceRoom ? (
+                <button onClick={() => joinVoice(selectedChat)} style={{ padding: '8px 16px', background: settings.accentColor, color: settings.bgColor, border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '500' }}>
+                  <Phone size={18} />Rejoindre vocal
+                </button>
+              ) : (
+                <button onClick={leaveVoice} style={{ padding: '8px 16px', background: '#ff4444', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '500' }}>
+                  <Phone size={18} />Quitter vocal
+                </button>
+              )}
+            </div>
+
+            <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
+              {filteredMessages.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#666', marginTop: '40px', fontSize: '14px' }}>
+                  Aucun message pour le moment. Soyez le premier à écrire ! 💬
+                </div>
+              ) : (
+                filteredMessages.map(msg => (
+                  <div key={msg.id} style={{ marginBottom: '20px', display: 'flex', gap: '12px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: msg.avatar ? `url(${msg.avatar})` : settings.accentColor, backgroundSize: 'cover', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '600', flexShrink: 0 }}>
+                      {!msg.avatar && msg.authorDisplay[0]}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ marginBottom: '4px' }}>
+                        <span style={{ fontWeight: '500', marginRight: '8px' }}>{msg.authorDisplay}</span>
+                        <span style={{ fontSize: '12px', color: '#666' }}>{new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                      {msg.content && <div style={{ color: '#ddd' }}>{msg.content}</div>}
+                      {msg.file && (msg.fileType.startsWith('image/') ? (
+                        <img src={msg.file} alt={msg.fileName} style={{ maxWidth: '400px', borderRadius: '8px', marginTop: '8px' }} />
+                      ) : msg.fileType.startsWith('video/') ? (
+                        <video src={msg.file} controls style={{ maxWidth: '400px', borderRadius: '8px', marginTop: '8px' }} />
+                      ) : null)}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div style={{ padding: '20px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'flex', gap: '12px', background: settings.secondaryColor, padding: '12px', borderRadius: '12px' }}>
+                <input type="file" ref={fileInputRef} onChange={sendFile} accept="image/*,video/*" style={{ display: 'none' }} />
+                <button onClick={() => fileInputRef.current?.click()} style={{ padding: '10px', background: 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '8px', color: settings.accentColor, cursor: 'pointer' }}><Plus size={20} /></button>
+                <input type="text" value={messageInput} onChange={(e) => setMessageInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && sendMessage()} placeholder="Écrivez un message..." style={{ flex: 1, padding: '10px', background: 'transparent', border: 'none', color: '#fff', outline: 'none' }} />
+                <button onClick={sendMessage} style={{ padding: '10px 20px', background: settings.accentColor, color: settings.bgColor, border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px' }}><Send size={18} /></button>
+              </div>
+            </div>
+          </div>
+		  
+		  {voiceRoom && (
+            <div style={{ width: '320px', background: settings.secondaryColor, borderLeft: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Users size={20} color={settings.accentColor} />Vocal
+                </h3>
+                <div style={{ fontSize: '14px', color: '#666' }}>
+                  {getVoiceParticipants().length === 1 ? `${getVoiceParticipants()[0]} est seul en vocal` : `${getVoiceParticipants().length} participants`}
+                </div>
+              </div>
+
+              <div style={{ flex: 1, padding: '16px' }}>
+                {getVoiceParticipants().map((participant, idx) => (
+                  <div key={idx} style={{ padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: settings.accentColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '600' }}>{participant[0]}</div>
+                    <span style={{ flex: 1 }}>{participant}</span>
+                    {voiceState.muted && <MicOff size={16} color="#ff4444" />}
+                  </div>
+                ))}
+
+                {voiceState.video && (
+                  <div style={{ marginTop: '16px' }}>
+                    <video ref={videoRef} autoPlay muted style={{ width: '100%', borderRadius: '12px', background: '#000' }} />
+                  </div>
+                )}
+
+                {voiceState.screen && (
+                  <div style={{ marginTop: '16px' }}>
+                    <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Monitor size={14} />Partage d'écran
+                    </div>
+                    <video ref={screenRef} autoPlay style={{ width: '100%', borderRadius: '12px', background: '#000' }} />
+                  </div>
                 )}
               </div>
+
+              <div style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button onClick={() => setVoiceState({ ...voiceState, muted: !voiceState.muted })} style={{ flex: '1 1 calc(50% - 4px)', padding: '12px', background: voiceState.muted ? '#ff4444' : 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  {voiceState.muted ? <MicOff size={18} /> : <Mic size={18} />}
+                </button>
+                <button onClick={() => setVoiceState({ ...voiceState, deafened: !voiceState.deafened })} style={{ flex: '1 1 calc(50% - 4px)', padding: '12px', background: voiceState.deafened ? '#ff4444' : 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '20px' }}>🎧</button>
+                <button onClick={toggleVideo} style={{ flex: '1 1 calc(50% - 4px)', padding: '12px', background: voiceState.video ? settings.accentColor : 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  {voiceState.video ? <Video size={18} /> : <VideoOff size={18} />}
+                </button>
+                <button onClick={toggleScreen} style={{ flex: '1 1 calc(50% - 4px)', padding: '12px', background: voiceState.screen ? settings.accentColor : 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}><Monitor size={18} /></button>
+              </div>
             </div>
-          ))}
-        </div>
+          )}
 
-        <div style={{ 
-          padding: '20px', 
-          borderTop: '1px solid rgba(255,255,255,0.05)'
-        }}>
-          <div style={{ 
-            display: 'flex', 
-            gap: '12px',
-            background: settings.secondaryColor,
-            padding: '12px',
-            borderRadius: '12px'
-          }}>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={sendFile}
-              accept="image/*,video/*"
-              style={{ display: 'none' }}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                padding: '10px',
-                background: 'rgba(255,255,255,0.05)',
-                border: 'none',
-                borderRadius: '8px',
-                color: settings.accentColor,
-                cursor: 'pointer'
-              }}
-            >
-              <Plus size={20} />
-            </button>
-            <input
-              type="text"
-              value={messageInput}
-              onChange={(e) => setMessageInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-              placeholder="Écrivez un message..."
-              style={{
-                flex: 1,
-                padding: '10px',
-                background: 'transparent',
-                border: 'none',
-                color: '#fff',
-                outline: 'none'
-              }}
-            />
-            <button
-              onClick={sendMessage}
-              style={{
-                padding: '10px 20px',
-                background: settings.accentColor,
-                color: settings.bgColor,
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontWeight: '500',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              <Send size={18} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Panneau vocal */}
-      {voiceRoom && (
-        <div style={{
-          width: '320px',
-          background: settings.secondaryColor,
-          borderLeft: '1px solid rgba(255,255,255,0.05)',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
-          <div style={{ 
-            padding: '20px', 
-            borderBottom: '1px solid rgba(255,255,255,0.05)'
-          }}>
-            <h3 style={{ 
-              margin: '0 0 16px 0', 
-              fontSize: '16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              <Users size={20} color={settings.accentColor} />
-              Vocal
-            </h3>
-            <div style={{ fontSize: '14px', color: '#666' }}>
-              {getVoiceParticipants().length === 1 ? 
-                `${getVoiceParticipants()[0]} est seul en vocal` :
-                `${getVoiceParticipants().length} participants`
-              }
-            </div>
-          </div>
-
-          <div style={{ flex: 1, padding: '16px' }}>
-            {getVoiceParticipants().map((participant, idx) => (
-              <div key={idx} style={{
-                padding: '12px',
-                background: 'rgba(255,255,255,0.05)',
-                borderRadius: '8px',
-                marginBottom: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px'
-              }}>
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  background: settings.accentColor,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '14px',
-                  fontWeight: '600'
-                }}>
-                  {participant[0]}
+          {showSettings && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+              <div style={{ background: settings.secondaryColor, borderRadius: '16px', width: '500px', maxHeight: '80vh', overflow: 'auto', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <h2 style={{ margin: 0, fontSize: '20px' }}>Paramètres</h2>
+                  <X size={24} style={{ cursor: 'pointer' }} onClick={() => setShowSettings(false)} />
                 </div>
-                <span style={{ flex: 1 }}>{participant}</span>
-                {voiceState.muted && <MicOff size={16} color="#ff4444" />}
-              </div>
-            ))}
-
-            {voiceState.video && (
-              <div style={{ marginTop: '16px' }}>
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  muted
-                  style={{
-                    width: '100%',
-                    borderRadius: '12px',
-                    background: '#000'
-                  }}
-                />
-              </div>
-            )}
-
-            {voiceState.screen && (
-              <div style={{ marginTop: '16px' }}>
-                <div style={{ 
-                  fontSize: '12px', 
-                  color: '#666', 
-                  marginBottom: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}>
-                  <Monitor size={14} />
-                  Partage d'écran
-                </div>
-                <video
-                  ref={screenRef}
-                  autoPlay
-                  style={{
-                    width: '100%',
-                    borderRadius: '12px',
-                    background: '#000'
-                  }}
-                />
-              </div>
-            )}
-          </div>
-
-          <div style={{ 
-            padding: '16px', 
-            borderTop: '1px solid rgba(255,255,255,0.05)',
-            display: 'flex',
-            gap: '8px',
-            flexWrap: 'wrap'
-          }}>
-            <button
-              onClick={() => setVoiceState({ ...voiceState, muted: !voiceState.muted })}
-              style={{
-                flex: '1 1 calc(50% - 4px)',
-                padding: '12px',
-                background: voiceState.muted ? '#ff4444' : 'rgba(255,255,255,0.05)',
-                border: 'none',
-                borderRadius: '8px',
-                color: '#fff',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
-            >
-              {voiceState.muted ? <MicOff size={18} /> : <Mic size={18} />}
-            </button>
-            <button
-              onClick={() => setVoiceState({ ...voiceState, deafened: !voiceState.deafened })}
-              style={{
-                flex: '1 1 calc(50% - 4px)',
-                padding: '12px',
-                background: voiceState.deafened ? '#ff4444' : 'rgba(255,255,255,0.05)',
-                border: 'none',
-                borderRadius: '8px',
-                color: '#fff',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                fontSize: '20px'
-              }}
-            >
-              🎧
-            </button>
-            <button
-              onClick={toggleVideo}
-              style={{
-                flex: '1 1 calc(50% - 4px)',
-                padding: '12px',
-                background: voiceState.video ? settings.accentColor : 'rgba(255,255,255,0.05)',
-                border: 'none',
-                borderRadius: '8px',
-                color: '#fff',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
-            >
-              {voiceState.video ? <Video size={18} /> : <VideoOff size={18} />}
-            </button>
-            <button
-              onClick={toggleScreen}
-              style={{
-                flex: '1 1 calc(50% - 4px)',
-                padding: '12px',
-                background: voiceState.screen ? settings.accentColor : 'rgba(255,255,255,0.05)',
-                border: 'none',
-                borderRadius: '8px',
-                color: '#fff',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px'
-              }}
-            >
-              <Monitor size={18} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Paramètres */}
-      {showSettings && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.8)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            background: settings.secondaryColor,
-            borderRadius: '16px',
-            width: '500px',
-            maxHeight: '80vh',
-            overflow: 'auto',
-            border: '1px solid rgba(255,255,255,0.1)'
-          }}>
-            <div style={{
-              padding: '24px',
-              borderBottom: '1px solid rgba(255,255,255,0.05)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <h2 style={{ margin: 0, fontSize: '20px' }}>Paramètres</h2>
-              <X 
-                size={24} 
-                style={{ cursor: 'pointer' }}
-                onClick={() => setShowSettings(false)}
-              />
-            </div>
-
-            <div style={{ padding: '24px' }}>
-              <h3 style={{ fontSize: '14px', color: '#888', marginBottom: '16px', textTransform: 'uppercase' }}>
-                Profil
-              </h3>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>
-                  Photo de profil
-                </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => e.target.files[0] && updateProfile('avatar', e.target.files[0])}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '8px',
-                    color: '#fff'
-                  }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>
-                  Pseudo affiché
-                </label>
-                <input
-                  type="text"
-                  value={currentUser.displayName}
-                  onChange={(e) => updateProfile('displayName', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '8px',
-                    color: '#fff'
-                  }}
-                />
-              </div>
-
-              <div style={{ 
-                padding: '12px',
-                background: 'rgba(255,255,255,0.03)',
-                borderRadius: '8px',
-                marginBottom: '32px'
-              }}>
-                <div style={{ fontSize: '12px', color: '#666' }}>Nom d'utilisateur</div>
-                <div style={{ fontSize: '14px', fontWeight: '500' }}>{currentUser.username}</div>
-              </div>
-
-              <h3 style={{ fontSize: '14px', color: '#888', marginBottom: '16px', textTransform: 'uppercase' }}>
-                Apparence
-              </h3>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>
-                  Couleur de fond
-                </label>
-                <input
-                  type="color"
-                  value={settings.bgColor}
-                  onChange={(e) => updateSettings('bgColor', e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: '50px',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '8px',
-                    cursor: 'pointer'
-                  }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>
-                  Couleur d'accent
-                </label>
-                <input
-                  type="color"
-                  value={settings.accentColor}
-                  onChange={(e) => updateSettings('accentColor', e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: '50px',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '8px',
-                    cursor: 'pointer'
-                  }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '32px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>
-                  Couleur secondaire
-                </label>
-                <input
-                  type="color"
-                  value={settings.secondaryColor}
-                  onChange={(e) => updateSettings('secondaryColor', e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: '50px',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '8px',
-                    cursor: 'pointer'
-                  }}
-                />
-              </div>
-
-              <h3 style={{ fontSize: '14px', color: '#888', marginBottom: '16px', textTransform: 'uppercase' }}>
-                Crédits
-              </h3>
-              <div style={{
-                padding: '16px',
-                background: 'rgba(0,212,255,0.1)',
-                borderRadius: '8px',
-                border: `1px solid ${settings.accentColor}40`
-              }}>
-                <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>
-                  GameTalk
-                </div>
-                <div style={{ fontSize: '14px', color: '#888' }}>
-                  Développé par <span style={{ color: settings.accentColor, fontWeight: '500' }}>AbdouTP</span> (dev)
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Ajouter un ami */}
-      {showAddFriend && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.8)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            background: settings.secondaryColor,
-            borderRadius: '16px',
-            width: '400px',
-            border: '1px solid rgba(255,255,255,0.1)'
-          }}>
-            <div style={{
-              padding: '24px',
-              borderBottom: '1px solid rgba(255,255,255,0.05)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <h2 style={{ margin: 0, fontSize: '20px' }}>Ajouter un ami</h2>
-              <X 
-                size={24} 
-                style={{ cursor: 'pointer' }}
-                onClick={() => setShowAddFriend(false)}
-              />
-            </div>
-
-            <div style={{ padding: '24px' }}>
-              <input
-                type="text"
-                value={friendRequest}
-                onChange={(e) => setFriendRequest(e.target.value)}
-                placeholder="Pseudo#0000"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '8px',
-                  color: '#fff',
-                  marginBottom: '16px'
-                }}
-              />
-              <button
-                onClick={addFriend}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  background: settings.accentColor,
-                  color: settings.bgColor,
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  fontSize: '16px'
-                }}
-              >
-                Ajouter
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Créer un groupe */}
-      {showCreateGroup && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.8)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            background: settings.secondaryColor,
-            borderRadius: '16px',
-            width: '400px',
-            maxHeight: '80vh',
-            overflow: 'auto',
-            border: '1px solid rgba(255,255,255,0.1)'
-          }}>
-            <div style={{
-              padding: '24px',
-              borderBottom: '1px solid rgba(255,255,255,0.05)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <h2 style={{ margin: 0, fontSize: '20px' }}>Créer un groupe</h2>
-              <X 
-                size={24} 
-                style={{ cursor: 'pointer' }}
-                onClick={() => setShowCreateGroup(false)}
-              />
-            </div>
-
-            <div style={{ padding: '24px' }}>
-              <input
-                type="text"
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                placeholder="Nom du groupe"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: '8px',
-                  color: '#fff',
-                  marginBottom: '16px'
-                }}
-              />
-
-              <h3 style={{ fontSize: '14px', marginBottom: '12px' }}>Sélectionner des amis</h3>
-              {friends.map(friend => (
-                <div
-                  key={friend.username}
-                  onClick={() => {
-                    if (selectedFriends.includes(friend.username)) {
-                      setSelectedFriends(selectedFriends.filter(f => f !== friend.username));
-                    } else {
-                      setSelectedFriends([...selectedFriends, friend.username]);
-                    }
-                  }}
-                  style={{
-                    padding: '12px',
-                    background: selectedFriends.includes(friend.username) ? 
-                      'rgba(0,212,255,0.1)' : 'rgba(255,255,255,0.05)',
-                    borderRadius: '8px',
-                    marginBottom: '8px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    border: selectedFriends.includes(friend.username) ?
-                      `1px solid ${settings.accentColor}` : '1px solid transparent'
-                  }}
-                >
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    background: friend.avatar ? `url(${friend.avatar})` : settings.accentColor,
-                    backgroundSize: 'cover',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '14px',
-                    fontWeight: '600'
-                  }}>
-                    {!friend.avatar && friend.displayName[0]}
+                <div style={{ padding: '24px' }}>
+                  <h3 style={{ fontSize: '14px', color: '#888', marginBottom: '16px', textTransform: 'uppercase' }}>Profil</h3>
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>Photo de profil</label>
+                    <input type="file" accept="image/*" onChange={(e) => e.target.files[0] && updateProfile('avatar', e.target.files[0])} style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }} />
                   </div>
-                  <span>{friend.displayName}</span>
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>Pseudo affiché</label>
+                    <input type="text" value={currentUser.displayName} onChange={(e) => updateProfile('displayName', e.target.value)} style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }} />
+                  </div>
+                  <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', marginBottom: '32px' }}>
+                    <div style={{ fontSize: '12px', color: '#666' }}>Nom d'utilisateur</div>
+                    <div style={{ fontSize: '14px', fontWeight: '500' }}>{currentUser.username}</div>
+                  </div>
+                  <h3 style={{ fontSize: '14px', color: '#888', marginBottom: '16px', textTransform: 'uppercase' }}>Apparence</h3>
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>Couleur de fond</label>
+                    <input type="color" value={settings.bgColor} onChange={(e) => updateSettings('bgColor', e.target.value)} style={{ width: '100%', height: '50px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', cursor: 'pointer' }} />
+                  </div>
+                  <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>Couleur d'accent</label>
+                    <input type="color" value={settings.accentColor} onChange={(e) => updateSettings('accentColor', e.target.value)} style={{ width: '100%', height: '50px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', cursor: 'pointer' }} />
+                  </div>
+                  <div style={{ marginBottom: '32px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>Couleur secondaire</label>
+                    <input type="color" value={settings.secondaryColor} onChange={(e) => updateSettings('secondaryColor', e.target.value)} style={{ width: '100%', height: '50px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', cursor: 'pointer' }} />
+                  </div>
+                  <h3 style={{ fontSize: '14px', color: '#888', marginBottom: '16px', textTransform: 'uppercase' }}>Crédits</h3>
+                  <div style={{ padding: '16px', background: 'rgba(0,212,255,0.1)', borderRadius: '8px', border: `1px solid ${settings.accentColor}40` }}>
+                    <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>GameTalk</div>
+                    <div style={{ fontSize: '14px', color: '#888' }}>Développé par <span style={{ color: settings.accentColor, fontWeight: '500' }}>AbdouTP</span> (dev)</div>
+                  </div>
                 </div>
-              ))}
-
-              <button
-                onClick={createGroup}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  background: settings.accentColor,
-                  color: settings.bgColor,
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  marginTop: '16px'
-                }}
-              >
-                Créer le groupe
-              </button>
+              </div>
             </div>
-          </div>
+          )}
+
+          {showAddFriend && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowAddFriend(false)}>
+              <div style={{ background: settings.secondaryColor, borderRadius: '16px', width: '400px', border: '1px solid rgba(255,255,255,0.1)' }} onClick={(e) => e.stopPropagation()}>
+                <div style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <h2 style={{ margin: 0, fontSize: '20px' }}>Ajouter un ami</h2>
+                  <X size={24} style={{ cursor: 'pointer' }} onClick={() => setShowAddFriend(false)} />
+                </div>
+                <div style={{ padding: '24px' }}>
+                  <input type="text" value={friendRequest} onChange={(e) => setFriendRequest(e.target.value)} placeholder="Pseudo#0000" style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', marginBottom: '16px' }} />
+                  <button onClick={addFriend} style={{ width: '100%', padding: '12px', background: settings.accentColor, color: settings.bgColor, border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '16px' }}>Ajouter</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showCreateGroup && (
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowCreateGroup(false)}>
+              <div style={{ background: settings.secondaryColor, borderRadius: '16px', width: '400px', maxHeight: '80vh', overflow: 'auto', border: '1px solid rgba(255,255,255,0.1)' }} onClick={(e) => e.stopPropagation()}>
+                <div style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <h2 style={{ margin: 0, fontSize: '20px' }}>Créer un groupe</h2>
+                  <X size={24} style={{ cursor: 'pointer' }} onClick={() => setShowCreateGroup(false)} />
+                </div>
+                <div style={{ padding: '24px' }}>
+                  <input type="text" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="Nom du groupe" style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', marginBottom: '16px' }} />
+                  <h3 style={{ fontSize: '14px', marginBottom: '12px' }}>Sélectionner des amis</h3>
+                  {friends.length === 0 ? (
+                    <div style={{ textAlign: 'center', color: '#666', padding: '20px', fontSize: '14px' }}>Ajoutez des amis d'abord pour créer un groupe</div>
+                  ) : (
+                    friends.map(friend => (
+                      <div key={friend.username} onClick={() => { if (selectedFriends.includes(friend.username)) { setSelectedFriends(selectedFriends.filter(f => f !== friend.username)); } else { setSelectedFriends([...selectedFriends, friend.username]); } }} style={{ padding: '12px', background: selectedFriends.includes(friend.username) ? 'rgba(0,212,255,0.1)' : 'rgba(255,255,255,0.05)', borderRadius: '8px', marginBottom: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', border: selectedFriends.includes(friend.username) ? `1px solid ${settings.accentColor}` : '1px solid transparent' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: friend.avatar ? `url(${friend.avatar})` : settings.accentColor, backgroundSize: 'cover', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '600' }}>
+                          {!friend.avatar && friend.displayName[0]}
+                        </div>
+                        <span>{friend.displayName}</span>
+                      </div>
+                    ))
+                  )}
+                  <button onClick={createGroup} style={{ width: '100%', padding: '12px', background: settings.accentColor, color: settings.bgColor, border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '16px', marginTop: '16px' }}>Créer le groupe</button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      )}
-    </div>
-  );
-};
+      );
+    };
     
-    // Puis ajoutez cette ligne à la fin :
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<GameTalk />);
   </script>
