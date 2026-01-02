@@ -8,6 +8,16 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: system-ui, -apple-system, sans-serif; overflow: hidden; }
     #root { width: 100vw; height: 100vh; }
+    
+    @media (max-width: 768px) {
+      .sidebar { width: 100% !important; max-width: 280px; position: fixed !important; left: 0; top: 0; bottom: 0; z-index: 100; transform: translateX(-100%); transition: transform 0.3s; }
+      .sidebar.open { transform: translateX(0); }
+      .voice-panel { display: none !important; }
+      .chat-area { margin-left: 0 !important; }
+      .mobile-menu { display: block !important; }
+      .mobile-close { display: block !important; }
+      .login-container { width: 90% !important; max-width: 400px; padding: 32px !important; }
+    }
   </style>
 </head>
 <body>
@@ -40,12 +50,34 @@
     const X = (props) => <Icon {...props}><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></Icon>;
     const Send = (props) => <Icon {...props}><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></Icon>;
     const Plus = (props) => <Icon {...props}><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></Icon>;
+    const Menu = (props) => <Icon {...props}><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></Icon>;
 
-    const memoryStorage = {
-      data: {},
-      get: (key) => memoryStorage.data[key] ? { value: memoryStorage.data[key] } : null,
-      set: (key, value) => { memoryStorage.data[key] = value; return { key, value }; },
-      delete: (key) => { delete memoryStorage.data[key]; return { key, deleted: true }; }
+    const storage = {
+      get: (key) => {
+        try {
+          const value = localStorage.getItem(key);
+          return value ? { value } : null;
+        } catch (error) {
+          return null;
+        }
+      },
+      set: (key, value) => {
+        try {
+          localStorage.setItem(key, value);
+          return { key, value };
+        } catch (error) {
+          console.error('Storage error:', error);
+          return null;
+        }
+      },
+      delete: (key) => {
+        try {
+          localStorage.removeItem(key);
+          return { key, deleted: true };
+        } catch (error) {
+          return null;
+        }
+      }
     };
 	
 	const GameTalk = () => {
@@ -68,66 +100,160 @@
       const [showCreateGroup, setShowCreateGroup] = useState(false);
       const [showAddFriend, setShowAddFriend] = useState(false);
       const [voiceState, setVoiceState] = useState({ muted: false, deafened: false, video: false, screen: false });
+      const [sidebarOpen, setSidebarOpen] = useState(false);
+      const [friendRequests, setFriendRequests] = useState([]);
+      const [notifications, setNotifications] = useState([]);
       const fileInputRef = useRef(null);
       const videoRef = useRef(null);
       const screenRef = useRef(null);
 
       useEffect(() => { loadData(); }, []);
+      
+      useEffect(() => {
+        if (currentUser) {
+          const interval = setInterval(() => {
+            checkNotifications();
+          }, 2000); // Vérifie toutes les 2 secondes
+          return () => clearInterval(interval);
+        }
+      }, [currentUser]);
 
       const loadData = () => {
         try {
-          const usersResult = memoryStorage.get('gametalk_users');
+          const usersResult = storage.get('gametalk_users');
           const loadedUsers = usersResult ? JSON.parse(usersResult.value) : [];
           setUsers(loadedUsers);
-          const messagesResult = memoryStorage.get('gametalk_messages');
+          const messagesResult = storage.get('gametalk_messages');
           const loadedMessages = messagesResult ? JSON.parse(messagesResult.value) : [];
           setMessages(loadedMessages);
-          const sessionResult = memoryStorage.get('gametalk_session');
+          const sessionResult = storage.get(`gametalk_session_${getBrowserId()}`);
           if (sessionResult) {
             const session = JSON.parse(sessionResult.value);
             const user = loadedUsers.find(u => u.username === session.username);
-            if (user) { setCurrentUser(user); loadUserData(user.username); setScreen('chat'); }
+            if (user) { 
+              setCurrentUser(user); 
+              loadUserData(user.username); 
+              setScreen('chat');
+              const settingsResult = storage.get(`gametalk_settings_${user.username}`);
+              if (settingsResult) setSettings(JSON.parse(settingsResult.value));
+            }
           }
-        } catch (error) { console.log('Première visite'); }
+        } catch (error) { console.log('Première visite', error); }
+      };
+
+      const getBrowserId = () => {
+        let browserId = localStorage.getItem('gametalk_browser_id');
+        if (!browserId) {
+          browserId = 'browser_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+          localStorage.setItem('gametalk_browser_id', browserId);
+        }
+        return browserId;
       };
 
       const loadUserData = (username) => {
         try {
-          const friendsResult = memoryStorage.get(`gametalk_friends_${username}`);
+          const friendsResult = storage.get(`gametalk_friends_${username}`);
           if (friendsResult) setFriends(JSON.parse(friendsResult.value));
-          const groupsResult = memoryStorage.get(`gametalk_groups_${username}`);
+          const groupsResult = storage.get(`gametalk_groups_${username}`);
           if (groupsResult) setGroups(JSON.parse(groupsResult.value));
+          const requestsResult = storage.get(`gametalk_requests_${username}`);
+          if (requestsResult) setFriendRequests(JSON.parse(requestsResult.value));
         } catch (error) { console.log('Pas de données utilisateur'); }
+      };
+      
+      const checkNotifications = () => {
+        if (!currentUser) return;
+        
+        // Vérifier les nouvelles demandes d'amis
+        const requestsResult = storage.get(`gametalk_requests_${currentUser.username}`);
+        const requests = requestsResult ? JSON.parse(requestsResult.value) : [];
+        setFriendRequests(requests);
+        
+        // Vérifier les nouveaux messages
+        const messagesResult = storage.get('gametalk_messages');
+        const allMessages = messagesResult ? JSON.parse(messagesResult.value) : [];
+        const unreadMessages = allMessages.filter(m => 
+          m.channel === currentUser.username && 
+          m.author !== currentUser.username &&
+          !m.read
+        );
+        
+        // Marquer comme lus si on est sur le chat
+        if (selectedChat !== 'general' && !selectedChat.startsWith('group_')) {
+          const updatedMessages = allMessages.map(m => {
+            if (m.channel === currentUser.username && m.author === selectedChat) {
+              return { ...m, read: true };
+            }
+            return m;
+          });
+          storage.set('gametalk_messages', JSON.stringify(updatedMessages));
+        }
+        
+        setMessages(allMessages);
       };
 
       const register = () => {
         if (!registerForm.username || !registerForm.password) { alert('Veuillez remplir tous les champs'); return; }
-        const userNumber = users.length + 1;
-        const tag = String(userNumber).padStart(4, '0');
+        
+        const counterResult = storage.get('gametalk_user_counter');
+        const currentCounter = counterResult ? parseInt(counterResult.value) : 0;
+        const newCounter = currentCounter + 1;
+        const tag = String(newCounter).padStart(4, '0');
         const fullUsername = `${registerForm.username}#${tag}`;
+        
+        const usersResult = storage.get('gametalk_users');
+        const currentUsers = usersResult ? JSON.parse(usersResult.value) : [];
+        
+        if (currentUsers.find(u => u.username === fullUsername)) {
+          alert('Cet utilisateur existe déjà !');
+          return;
+        }
+        
         const newUser = { username: fullUsername, password: registerForm.password, avatar: null, displayName: registerForm.username, createdAt: Date.now() };
-        const updatedUsers = [...users, newUser];
+        const updatedUsers = [...currentUsers, newUser];
+        
         setUsers(updatedUsers);
-        memoryStorage.set('gametalk_users', JSON.stringify(updatedUsers));
-        alert(`Compte créé! Votre nom d'utilisateur est: ${fullUsername}`);
+        storage.set('gametalk_users', JSON.stringify(updatedUsers));
+        storage.set('gametalk_user_counter', String(newCounter));
+        
+        alert(`✅ Compte créé avec succès!\n\nVotre nom d'utilisateur est:\n${fullUsername}\n\n⚠️ Notez-le bien pour vous connecter !`);
         setRegisterForm({ username: '', password: '' });
       };
 
       const login = () => {
-        const user = users.find(u => u.username === loginForm.username && u.password === loginForm.password);
-        if (user) { setCurrentUser(user); memoryStorage.set('gametalk_session', JSON.stringify({ username: user.username })); loadUserData(user.username); setScreen('chat'); }
+        const usersResult = storage.get('gametalk_users');
+        const allUsers = usersResult ? JSON.parse(usersResult.value) : [];
+        setUsers(allUsers);
+        
+        const user = allUsers.find(u => u.username === loginForm.username && u.password === loginForm.password);
+        if (user) { 
+          setCurrentUser(user); 
+          storage.set(`gametalk_session_${getBrowserId()}`, JSON.stringify({ username: user.username })); 
+          loadUserData(user.username); 
+          const settingsResult = storage.get(`gametalk_settings_${user.username}`);
+          if (settingsResult) setSettings(JSON.parse(settingsResult.value));
+          setScreen('chat'); 
+        }
         else alert('Identifiants incorrects');
       };
 
-      const logout = () => { memoryStorage.delete('gametalk_session'); setCurrentUser(null); setScreen('login'); leaveVoice(); };
+      const logout = () => { 
+        storage.delete(`gametalk_session_${getBrowserId()}`); 
+        setCurrentUser(null); 
+        setScreen('login'); 
+        leaveVoice(); 
+      };
 
       const sendMessage = () => {
         if (!messageInput.trim()) return;
         const newMessage = { id: Date.now(), author: currentUser.username, authorDisplay: currentUser.displayName, avatar: currentUser.avatar, content: messageInput, channel: selectedChat, timestamp: Date.now() };
-        const updatedMessages = [...messages, newMessage];
+        const messagesResult = storage.get('gametalk_messages');
+        const currentMessages = messagesResult ? JSON.parse(messagesResult.value) : [];
+        const updatedMessages = [...currentMessages, newMessage];
         setMessages(updatedMessages);
-        memoryStorage.set('gametalk_messages', JSON.stringify(updatedMessages));
+        storage.set('gametalk_messages', JSON.stringify(updatedMessages));
         setMessageInput('');
+        setSidebarOpen(false);
       };
 
       const sendFile = (e) => {
@@ -139,23 +265,87 @@
         const reader = new FileReader();
         reader.onload = (event) => {
           const newMessage = { id: Date.now(), author: currentUser.username, authorDisplay: currentUser.displayName, avatar: currentUser.avatar, content: '', file: event.target.result, fileType: file.type, fileName: file.name, channel: selectedChat, timestamp: Date.now() };
-          const updatedMessages = [...messages, newMessage];
+          const messagesResult = storage.get('gametalk_messages');
+          const currentMessages = messagesResult ? JSON.parse(messagesResult.value) : [];
+          const updatedMessages = [...currentMessages, newMessage];
           setMessages(updatedMessages);
-          memoryStorage.set('gametalk_messages', JSON.stringify(updatedMessages));
+          storage.set('gametalk_messages', JSON.stringify(updatedMessages));
         };
         reader.readAsDataURL(file);
       };
 
       const addFriend = () => {
-        const friend = users.find(u => u.username === friendRequest);
-        if (!friend) { alert('Utilisateur non trouvé'); return; }
+        const usersResult = storage.get('gametalk_users');
+        const allUsers = usersResult ? JSON.parse(usersResult.value) : [];
+        
+        const friend = allUsers.find(u => u.username === friendRequest.trim());
+        if (!friend) { 
+          alert('Utilisateur non trouvé. Assurez-vous d\'utiliser le format exact: Pseudo#0001'); 
+          return; 
+        }
         if (friend.username === currentUser.username) { alert('Vous ne pouvez pas vous ajouter vous-même'); return; }
         if (friends.find(f => f.username === friend.username)) { alert('Déjà dans vos amis'); return; }
-        const updatedFriends = [...friends, friend];
-        setFriends(updatedFriends);
-        memoryStorage.set(`gametalk_friends_${currentUser.username}`, JSON.stringify(updatedFriends));
+        
+        // Créer une demande d'ami
+        const requestsResult = storage.get(`gametalk_requests_${friend.username}`);
+        const currentRequests = requestsResult ? JSON.parse(requestsResult.value) : [];
+        
+        // Vérifier si une demande existe déjà
+        if (currentRequests.find(r => r.from === currentUser.username)) {
+          alert('Demande déjà envoyée !');
+          return;
+        }
+        
+        const newRequest = {
+          id: Date.now(),
+          from: currentUser.username,
+          fromDisplay: currentUser.displayName,
+          fromAvatar: currentUser.avatar,
+          timestamp: Date.now()
+        };
+        
+        const updatedRequests = [...currentRequests, newRequest];
+        storage.set(`gametalk_requests_${friend.username}`, JSON.stringify(updatedRequests));
+        
         setFriendRequest('');
         setShowAddFriend(false);
+        alert(`✅ Demande d'ami envoyée à ${friend.displayName} !`);
+      };
+      
+      const acceptFriendRequest = (request) => {
+        const usersResult = storage.get('gametalk_users');
+        const allUsers = usersResult ? JSON.parse(usersResult.value) : [];
+        const friend = allUsers.find(u => u.username === request.from);
+        
+        if (!friend) return;
+        
+        // Ajouter aux amis des deux utilisateurs
+        const updatedFriends = [...friends, friend];
+        setFriends(updatedFriends);
+        storage.set(`gametalk_friends_${currentUser.username}`, JSON.stringify(updatedFriends));
+        
+        // Ajouter aussi l'utilisateur actuel aux amis de l'autre
+        const friendFriendsResult = storage.get(`gametalk_friends_${friend.username}`);
+        const friendFriends = friendFriendsResult ? JSON.parse(friendFriendsResult.value) : [];
+        const updatedFriendFriends = [...friendFriends, {
+          username: currentUser.username,
+          displayName: currentUser.displayName,
+          avatar: currentUser.avatar
+        }];
+        storage.set(`gametalk_friends_${friend.username}`, JSON.stringify(updatedFriendFriends));
+        
+        // Supprimer la demande
+        const updatedRequests = friendRequests.filter(r => r.id !== request.id);
+        setFriendRequests(updatedRequests);
+        storage.set(`gametalk_requests_${currentUser.username}`, JSON.stringify(updatedRequests));
+        
+        alert(`✅ ${friend.displayName} a été ajouté à vos amis !`);
+      };
+      
+      const rejectFriendRequest = (request) => {
+        const updatedRequests = friendRequests.filter(r => r.id !== request.id);
+        setFriendRequests(updatedRequests);
+        storage.set(`gametalk_requests_${currentUser.username}`, JSON.stringify(updatedRequests));
       };
 
       const createGroup = () => {
@@ -163,7 +353,7 @@
         const newGroup = { id: Date.now(), name: newGroupName, members: [currentUser.username, ...selectedFriends], createdAt: Date.now() };
         const updatedGroups = [...groups, newGroup];
         setGroups(updatedGroups);
-        memoryStorage.set(`gametalk_groups_${currentUser.username}`, JSON.stringify(updatedGroups));
+        storage.set(`gametalk_groups_${currentUser.username}`, JSON.stringify(updatedGroups));
         setNewGroupName(''); setSelectedFriends([]); setShowCreateGroup(false);
       };
 
@@ -190,7 +380,11 @@
         }
       };
 
-      const updateSettings = (key, value) => { const newSettings = { ...settings, [key]: value }; setSettings(newSettings); memoryStorage.set(`gametalk_settings_${currentUser.username}`, JSON.stringify(newSettings)); };
+      const updateSettings = (key, value) => { 
+        const newSettings = { ...settings, [key]: value }; 
+        setSettings(newSettings); 
+        storage.set(`gametalk_settings_${currentUser.username}`, JSON.stringify(newSettings)); 
+      };
 
       const updateProfile = (field, value) => {
         if (field === 'avatar') {
@@ -198,17 +392,21 @@
           reader.onload = (e) => {
             const updatedUser = { ...currentUser, avatar: e.target.result };
             setCurrentUser(updatedUser);
-            const updatedUsers = users.map(u => u.username === currentUser.username ? updatedUser : u);
+            const usersResult = storage.get('gametalk_users');
+            const currentUsers = usersResult ? JSON.parse(usersResult.value) : [];
+            const updatedUsers = currentUsers.map(u => u.username === currentUser.username ? updatedUser : u);
             setUsers(updatedUsers);
-            memoryStorage.set('gametalk_users', JSON.stringify(updatedUsers));
+            storage.set('gametalk_users', JSON.stringify(updatedUsers));
           };
           reader.readAsDataURL(file);
         } else if (field === 'displayName') {
           const updatedUser = { ...currentUser, displayName: value };
           setCurrentUser(updatedUser);
-          const updatedUsers = users.map(u => u.username === currentUser.username ? updatedUser : u);
+          const usersResult = storage.get('gametalk_users');
+          const currentUsers = usersResult ? JSON.parse(usersResult.value) : [];
+          const updatedUsers = currentUsers.map(u => u.username === currentUser.username ? updatedUser : u);
           setUsers(updatedUsers);
-          memoryStorage.set('gametalk_users', JSON.stringify(updatedUsers));
+          storage.set('gametalk_users', JSON.stringify(updatedUsers));
         }
       };
 
@@ -217,8 +415,8 @@
 	  
 	  if (screen === 'login') {
         return (
-          <div style={{ minHeight: '100vh', background: `linear-gradient(135deg, ${settings.bgColor} 0%, ${settings.secondaryColor} 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)', borderRadius: '24px', padding: '48px', width: '400px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+          <div style={{ minHeight: '100vh', background: `linear-gradient(135deg, ${settings.bgColor} 0%, ${settings.secondaryColor} 100%)`, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div className="login-container" style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)', borderRadius: '24px', padding: '48px', width: '400px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
               <div style={{ textAlign: 'center', marginBottom: '32px' }}>
                 <h1 style={{ color: settings.accentColor, fontSize: '42px', margin: '0 0 8px 0', fontWeight: '800', textShadow: `0 0 30px ${settings.accentColor}80` }}>GameTalk</h1>
                 <p style={{ color: '#888', margin: 0 }}>Connectez-vous avec vos amis</p>
@@ -241,15 +439,16 @@
       }
 
       return (
-        <div style={{ height: '100vh', display: 'flex', background: settings.bgColor, color: '#fff', overflow: 'hidden' }}>
-          <div style={{ width: '280px', background: settings.secondaryColor, borderRight: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ height: '100vh', display: 'flex', background: settings.bgColor, color: '#fff', overflow: 'hidden', position: 'relative' }}>
+          <div className={`sidebar ${sidebarOpen ? 'open' : ''}`} style={{ width: '280px', background: settings.secondaryColor, borderRight: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <h2 style={{ color: settings.accentColor, margin: 0, fontSize: '24px', fontWeight: '800' }}>GameTalk</h2>
+              <X size={24} style={{ cursor: 'pointer', display: 'none' }} className="mobile-close" onClick={() => setSidebarOpen(false)} />
             </div>
             <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
               <div style={{ marginBottom: '24px' }}>
                 <h3 style={{ fontSize: '12px', color: '#888', textTransform: 'uppercase', marginBottom: '12px' }}>Canaux</h3>
-                <div onClick={() => setSelectedChat('general')} style={{ padding: '10px 12px', background: selectedChat === 'general' ? 'rgba(0,212,255,0.1)' : 'transparent', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div onClick={() => { setSelectedChat('general'); setSidebarOpen(false); }} style={{ padding: '10px 12px', background: selectedChat === 'general' ? 'rgba(0,212,255,0.1)' : 'transparent', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <MessageSquare size={18} color={settings.accentColor} />
                   <span>Général</span>
                 </div>
@@ -260,7 +459,7 @@
                   <UserPlus size={16} style={{ cursor: 'pointer', color: settings.accentColor }} onClick={() => setShowAddFriend(true)} />
                 </div>
                 {friends.map(friend => (
-                  <div key={friend.username} onClick={() => setSelectedChat(friend.username)} style={{ padding: '10px 12px', background: selectedChat === friend.username ? 'rgba(0,212,255,0.1)' : 'transparent', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <div key={friend.username} onClick={() => { setSelectedChat(friend.username); setSidebarOpen(false); }} style={{ padding: '10px 12px', background: selectedChat === friend.username ? 'rgba(0,212,255,0.1)' : 'transparent', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                     <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: friend.avatar ? `url(${friend.avatar})` : settings.accentColor, backgroundSize: 'cover', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '600' }}>
                       {!friend.avatar && friend.displayName[0]}
                     </div>
@@ -274,7 +473,7 @@
                   <Plus size={16} style={{ cursor: 'pointer', color: settings.accentColor }} onClick={() => setShowCreateGroup(true)} />
                 </div>
                 {groups.map(group => (
-                  <div key={group.id} onClick={() => setSelectedChat(`group_${group.id}`)} style={{ padding: '10px 12px', background: selectedChat === `group_${group.id}` ? 'rgba(0,212,255,0.1)' : 'transparent', borderRadius: '8px', cursor: 'pointer', marginBottom: '4px' }}>
+                  <div key={group.id} onClick={() => { setSelectedChat(`group_${group.id}`); setSidebarOpen(false); }} style={{ padding: '10px 12px', background: selectedChat === `group_${group.id}` ? 'rgba(0,212,255,0.1)' : 'transparent', borderRadius: '8px', cursor: 'pointer', marginBottom: '4px' }}>
                     <div style={{ fontSize: '14px', fontWeight: '500' }}>{group.name}</div>
                     <div style={{ fontSize: '11px', color: '#666' }}>{group.members.length} membres</div>
                   </div>
@@ -298,18 +497,21 @@
             </div>
           </div>
 
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div className="chat-area" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>
-                {selectedChat === 'general' ? '# Général' : selectedChat.startsWith('group_') ? groups.find(g => `group_${g.id}` === selectedChat)?.name : friends.find(f => f.username === selectedChat)?.displayName}
-              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Menu size={24} style={{ cursor: 'pointer', display: 'none' }} className="mobile-menu" onClick={() => setSidebarOpen(true)} />
+                <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '600' }}>
+                  {selectedChat === 'general' ? '# Général' : selectedChat.startsWith('group_') ? groups.find(g => `group_${g.id}` === selectedChat)?.name : friends.find(f => f.username === selectedChat)?.displayName}
+                </h2>
+              </div>
               {!voiceRoom ? (
-                <button onClick={() => joinVoice(selectedChat)} style={{ padding: '8px 16px', background: settings.accentColor, color: settings.bgColor, border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '500' }}>
-                  <Phone size={18} />Rejoindre vocal
+                <button onClick={() => joinVoice(selectedChat)} style={{ padding: '8px 16px', background: settings.accentColor, color: settings.bgColor, border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '500', fontSize: '14px' }}>
+                  <Phone size={18} /><span style={{ display: window.innerWidth > 768 ? 'block' : 'none' }}>Rejoindre vocal</span>
                 </button>
               ) : (
-                <button onClick={leaveVoice} style={{ padding: '8px 16px', background: '#ff4444', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '500' }}>
-                  <Phone size={18} />Quitter vocal
+                <button onClick={leaveVoice} style={{ padding: '8px 16px', background: '#ff4444', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '500', fontSize: '14px' }}>
+                  <Phone size={18} /><span style={{ display: window.innerWidth > 768 ? 'block' : 'none' }}>Quitter vocal</span>
                 </button>
               )}
             </div>
@@ -332,9 +534,9 @@
                       </div>
                       {msg.content && <div style={{ color: '#ddd' }}>{msg.content}</div>}
                       {msg.file && (msg.fileType.startsWith('image/') ? (
-                        <img src={msg.file} alt={msg.fileName} style={{ maxWidth: '400px', borderRadius: '8px', marginTop: '8px' }} />
+                        <img src={msg.file} alt={msg.fileName} style={{ maxWidth: '100%', maxWidth: '400px', borderRadius: '8px', marginTop: '8px' }} />
                       ) : msg.fileType.startsWith('video/') ? (
-                        <video src={msg.file} controls style={{ maxWidth: '400px', borderRadius: '8px', marginTop: '8px' }} />
+                        <video src={msg.file} controls style={{ maxWidth: '100%', maxWidth: '400px', borderRadius: '8px', marginTop: '8px' }} />
                       ) : null)}
                     </div>
                   </div>
@@ -353,7 +555,7 @@
           </div>
 		  
 		  {voiceRoom && (
-            <div style={{ width: '320px', background: settings.secondaryColor, borderLeft: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column' }}>
+            <div className="voice-panel" style={{ width: '320px', background: settings.secondaryColor, borderLeft: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column' }}>
               <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                 <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Users size={20} color={settings.accentColor} />Vocal
@@ -403,7 +605,7 @@
 
           {showSettings && (
             <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-              <div style={{ background: settings.secondaryColor, borderRadius: '16px', width: '500px', maxHeight: '80vh', overflow: 'auto', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ background: settings.secondaryColor, borderRadius: '16px', width: '90%', maxWidth: '500px', maxHeight: '80vh', overflow: 'auto', border: '1px solid rgba(255,255,255,0.1)' }}>
                 <div style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <h2 style={{ margin: 0, fontSize: '20px' }}>Paramètres</h2>
                   <X size={24} style={{ cursor: 'pointer' }} onClick={() => setShowSettings(false)} />
@@ -446,23 +648,28 @@
           )}
 
           {showAddFriend && (
-            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowAddFriend(false)}>
-              <div style={{ background: settings.secondaryColor, borderRadius: '16px', width: '400px', border: '1px solid rgba(255,255,255,0.1)' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }} onClick={() => setShowAddFriend(false)}>
+              <div style={{ background: settings.secondaryColor, borderRadius: '16px', width: '100%', maxWidth: '400px', border: '1px solid rgba(255,255,255,0.1)' }} onClick={(e) => e.stopPropagation()}>
                 <div style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <h2 style={{ margin: 0, fontSize: '20px' }}>Ajouter un ami</h2>
                   <X size={24} style={{ cursor: 'pointer' }} onClick={() => setShowAddFriend(false)} />
                 </div>
                 <div style={{ padding: '24px' }}>
                   <input type="text" value={friendRequest} onChange={(e) => setFriendRequest(e.target.value)} placeholder="Pseudo#0000" style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', marginBottom: '16px' }} />
-                  <button onClick={addFriend} style={{ width: '100%', padding: '12px', background: settings.accentColor, color: settings.bgColor, border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '16px' }}>Ajouter</button>
+                  <button onClick={addFriend} style={{ width: '100%', padding: '12px', background: settings.accentColor, color: settings.bgColor, border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '16px', marginBottom: '12px' }}>Ajouter</button>
+                  <button onClick={() => {
+                    const usersResult = storage.get('gametalk_users');
+                    const allUsers = usersResult ? JSON.parse(usersResult.value) : [];
+                    alert('Utilisateurs inscrits:\n\n' + allUsers.map(u => u.username).join('\n'));
+                  }} style={{ width: '100%', padding: '10px', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' }}>📋 Voir tous les utilisateurs</button>
                 </div>
               </div>
             </div>
           )}
 
           {showCreateGroup && (
-            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setShowCreateGroup(false)}>
-              <div style={{ background: settings.secondaryColor, borderRadius: '16px', width: '400px', maxHeight: '80vh', overflow: 'auto', border: '1px solid rgba(255,255,255,0.1)' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }} onClick={() => setShowCreateGroup(false)}>
+              <div style={{ background: settings.secondaryColor, borderRadius: '16px', width: '100%', maxWidth: '400px', maxHeight: '80vh', overflow: 'auto', border: '1px solid rgba(255,255,255,0.1)' }} onClick={(e) => e.stopPropagation()}>
                 <div style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <h2 style={{ margin: 0, fontSize: '20px' }}>Créer un groupe</h2>
                   <X size={24} style={{ cursor: 'pointer' }} onClick={() => setShowCreateGroup(false)} />
